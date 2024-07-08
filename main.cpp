@@ -1,122 +1,113 @@
-#include <QCoreApplication>
-#include <iostream>
-#include <vector>
+#include <QFile>
+#include <QDataStream>
+#include <QVector>
+#include <QDebug>
 #include <algorithm>
-#include <cmath>
-#include <fstream>
-#include <cstring>
-#include <iostream>
-#include <fstream>
-#include <vector>
-
-// Функция для определения порядка байтов системы
-bool isLittleEndian() {
-    int num = 1;
-    return (*(char *)&num == 1);
-}
-
-// Функция для чтения float в формате little endian
-float readFloatLittleEndian(std::ifstream& file) {
-    float value;
-    char buffer[sizeof(float)];
-    file.read(buffer, sizeof(float));
-
-    // Преобразование из little endian в нативный формат
-    if (!isLittleEndian()) {
-        std::cout << 1 << std::endl;
-        std::reverse(std::begin(buffer), std::end(buffer));
-    }
-
-    std::memcpy(&value, buffer, sizeof(float));
-    return value;
-}
 
 // Функция для медианной фильтрации
-std::vector<float> medianFilter(const std::vector<float>& signal, int windowSize) {
-    std::vector<float> filtered(signal.size());
-    std::vector<float> window(windowSize);
+QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
+    QVector<float> result = input;
+    QVector<float> window(windowSize);
 
-    for (int i = 0; i < signal.size(); ++i) {
+    for (int i = 0; i < input.size(); ++i) {
         for (int j = 0; j < windowSize; ++j) {
             int idx = i - windowSize / 2 + j;
-            if (idx < 0) idx = 0;
-            if (idx >= signal.size()) idx = signal.size() - 1;
-            window[j] = signal[idx];
+            if (idx < 0) {
+                idx = 0;
+            }
+            if (idx >= input.size()) {
+                idx = input.size() - 1;
+            }
+            window[j] = input[idx];
         }
         std::nth_element(window.begin(), window.begin() + windowSize / 2, window.end());
-        filtered[i] = window[windowSize / 2];
+        result[i] = window[windowSize / 2];
     }
-
-    return filtered;
+    return result;
 }
 
-// Функция для расчета стандартного отклонения
-float calculateStdDev(const std::vector<float>& signal) {
-    float sum = 0.0f, sum_sq = 0.0f;
-    for (float value : signal) {
-        sum += value;
-        sum_sq += value * value;
-    }
-    float mean = sum / signal.size();
-    return std::sqrt(sum_sq / signal.size() - mean * mean);
-}
-
-
-
-int main() {
-    // Чтение данных из бинарного файла
-    std::vector<float> signal;
-    std::ifstream file("rollercoaster/detector_src_32f.bin", std::ios::binary);
-
-    if (!file) {
-        std::cerr << "Unable to open file" << std::endl;
+int main(int argc, char *argv[]) {
+    if (argc != 5) {
+        qDebug() << "Usage: " << argv[0] << " <string1> <string2> <int1> <int2>";
         return 1;
     }
 
-    float minValue = std::numeric_limits<float>::max();
-    float maxValue = std::numeric_limits<float>::lowest();
-    double sum = 0.0;
-    int count = 0;
+    QString inputFileName = argv[1];
+    QString outputFileName = argv[2];
+    int minPeakWidth = std::stoi(argv[3]);
+    int maxPeakWidth = std::stoi(argv[4]);
+    int windowSize = 50; // Размер окна фильтра
 
-//    while (file) {
-//        float value = readFloatLittleEndian(file);
-//        if (file) {
-//            signal.push_back(value);
-//            minValue = std::min(minValue, value);
-//            maxValue = std::max(maxValue, value);
-//            sum += value;
-//            count++;
-//        }
-//    }
-//    file.close();
 
-//    // Вывод статистики
-//    std::cout << "Read " << signal.size() << " values from the file." << std::endl;
-//    std::cout << "Min value: " << minValue << std::endl;
-//    std::cout << "Max value: " << maxValue << std::endl;
-//    std::cout << "Average value: " << (sum / count) << std::endl;
+    QFile file(inputFileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Cannot open file for reading";
+        return 1;
+    }
 
-//    // Проверка на отрицательные значения
-//    bool allNegative = std::all_of(signal.begin(), signal.end(), [](float v) { return v < 0; });
-//    std::cout << "All values are negative: " << (allNegative ? "Yes" : "No") << std::endl;
+    QDataStream in(&file);
+    in.setByteOrder(QDataStream::LittleEndian);
 
-//    // Параметры
-//    int windowSize = 5; // Размер окна медианного фильтра
+    QVector<float> data;
+    float value;
+    while (!in.atEnd()) {
+        in >> value;
+        data.push_back(value);
+    }
 
-//    // Применение медианного фильтра
-//    std::vector<float> filtered = medianFilter(signal, windowSize);
+    file.close();
 
-//    // Вычитание отфильтрованного сигнала из исходного
-//    std::vector<float> noise(signal.size());
-//    for (int i = 0; i < signal.size(); ++i) {
-//        noise[i] = signal[i] - filtered[i];
-//    }
+    // Применяем медианный фильтр
+    QVector<float> filteredData = medianFilter(data, windowSize);
 
-//    // Расчет уровня шума
-//    float noiseLevel = calculateStdDev(noise);
+    // Находим медиану отфильтрованных данных
+    QVector<float> sortedData = filteredData;
+    std::nth_element(sortedData.begin(), sortedData.begin() + sortedData.size() / 2, sortedData.end());
+    float floorLevel = sortedData[sortedData.size() / 2];
 
-//    // Вывод результатов
-//    std::cout << "Estimated noise level: " << noiseLevel << std::endl;
+    // Находим горки
+    QVector<int> peakStarts;
+    QVector<int> peakEnds;
+    bool inPeak = false;
+    int peakStart = 0;
 
-//    return 0;
-//}
+    for (int i = 0; i < data.size(); ++i) {
+        if (!inPeak && data[i] > floorLevel) {
+            inPeak = true;
+            peakStart = i;
+        } else if (inPeak && data[i] <= floorLevel) {
+            inPeak = false;
+            int peakWidth = i - peakStart;
+            if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
+                peakStarts.push_back(peakStart);
+                peakEnds.push_back(i - 1);
+            }
+        }
+    }
+
+    // Если последняя горка не закончилась
+    if (inPeak) {
+        int peakWidth = data.size() - peakStart;
+        if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
+            peakStarts.push_back(peakStart);
+            peakEnds.push_back(data.size() - 1);
+        }
+    }
+
+    // Записываем результаты в файл
+    QFile outputFile(outputFileName);
+    if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "Cannot open file for writing:" << outputFileName;
+        return 1;
+    }
+
+    QTextStream out(&outputFile);
+    for (int i = 0; i < peakStarts.size(); ++i) {
+        out << peakStarts[i] << " " << peakEnds[i] << "\n";
+    }
+    outputFile.close();
+
+    qDebug() << "Found" << peakStarts.size() << "peaks. Results saved to" << outputFileName;
+
+    return 0;
+}
