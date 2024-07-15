@@ -3,8 +3,8 @@
 #include <QVector>
 #include <QDebug>
 #include <algorithm>
+#include <gtest/gtest.h>
 
-// Функция для медианной фильтрации
 QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
     QVector<float> result = input;
     QVector<float> window(windowSize);
@@ -26,18 +26,85 @@ QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
     return result;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc != 5) {
-        qDebug() << "Usage: " << argv[0] << " <string1> <string2> <int1> <int2>";
-        return 1;
+QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLevel, int minPeakWidth, int maxPeakWidth) {
+    QVector<std::pair<int, int>> peaks;
+    bool inPeak = false;
+    int peakStart = 0;
+
+    for (int i = 0; i < data.size(); ++i) {
+        if (!inPeak && data[i] > floorLevel) {
+            inPeak = true;
+            peakStart = i;
+        } else if (inPeak && data[i] <= floorLevel) {
+            inPeak = false;
+            int peakWidth = i - peakStart;
+            if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
+                peaks.push_back(std::make_pair(peakStart, i - 1));
+            }
+        }
     }
 
-    QString inputFileName = argv[1];
-    QString outputFileName = argv[2];
-    int minPeakWidth = std::stoi(argv[3]);
-    int maxPeakWidth = std::stoi(argv[4]);
-    int windowSize = 50; // Размер окна фильтра
+    if (inPeak) {
+        int peakWidth = data.size() - peakStart;
+        if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
+            peaks.push_back(std::make_pair(peakStart, data.size() - 1));
+        }
+    }
 
+    return peaks;
+}
+
+TEST(PeakDetectorTest, OutputFileHasTwoIntegersPerLine) {
+    QString outputFileName = "output.txt";
+
+    QFile outputFile(outputFileName);
+    if (!outputFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        FAIL() << "Failed to open file: " << outputFileName.toStdString();
+        return;
+    }
+
+    QTextStream in(&outputFile);
+    QString line;
+    QStringList parts;
+    int lineNumber = 1;
+
+    while (!in.atEnd()) {
+        line = in.readLine();
+        parts = line.split(" ");
+
+        if (parts.size() != 2) {
+            FAIL() << "Line " << lineNumber << " does not contain two integers separated by a space: "
+                   << line.toStdString();
+            outputFile.close();
+            return;
+        }
+
+        bool ok1, ok2;
+        parts[0].toInt(&ok1);
+        parts[1].toInt(&ok2);
+
+        if (!ok1) {
+            FAIL() << "First value is not an integer on line " << lineNumber << ": "
+                   << parts[0].toStdString();
+        }
+
+        if (!ok2) {
+            FAIL() << "Second value is not an integer on line " << lineNumber << ": "
+                   << parts[1].toStdString();
+        }
+
+        ++lineNumber;
+    }
+
+    outputFile.close();
+}
+
+int main(int argc, char *argv[]) {
+    QString inputFileName = "rollercoaster/detector_src_32f.bin";
+    QString outputFileName = "output.txt";
+    int minPeakWidth = 3;
+    int maxPeakWidth = 100;
+    int windowSize = 50;
 
     QFile file(inputFileName);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -57,57 +124,27 @@ int main(int argc, char *argv[]) {
 
     file.close();
 
-    // Применяем медианный фильтр
     QVector<float> filteredData = medianFilter(data, windowSize);
 
-    // Находим медиану отфильтрованных данных
     QVector<float> sortedData = filteredData;
     std::nth_element(sortedData.begin(), sortedData.begin() + sortedData.size() / 2, sortedData.end());
     float floorLevel = sortedData[sortedData.size() / 2];
 
-    // Находим горки
-    QVector<int> peakStarts;
-    QVector<int> peakEnds;
-    bool inPeak = false;
-    int peakStart = 0;
+    QVector<std::pair<int, int>> peaks = findPeaks(data, floorLevel, minPeakWidth, maxPeakWidth);
 
-    for (int i = 0; i < data.size(); ++i) {
-        if (!inPeak && data[i] > floorLevel) {
-            inPeak = true;
-            peakStart = i;
-        } else if (inPeak && data[i] <= floorLevel) {
-            inPeak = false;
-            int peakWidth = i - peakStart;
-            if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
-                peakStarts.push_back(peakStart);
-                peakEnds.push_back(i - 1);
-            }
-        }
-    }
-
-    // Если последняя горка не закончилась
-    if (inPeak) {
-        int peakWidth = data.size() - peakStart;
-        if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
-            peakStarts.push_back(peakStart);
-            peakEnds.push_back(data.size() - 1);
-        }
-    }
-
-    // Записываем результаты в файл
     QFile outputFile(outputFileName);
     if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "Cannot open file for writing:" << outputFileName;
         return 1;
     }
-
     QTextStream out(&outputFile);
-    for (int i = 0; i < peakStarts.size(); ++i) {
-        out << peakStarts[i] << " " << peakEnds[i] << "\n";
+    for (int i = 0; i < peaks.size(); ++i) {
+        out << peaks[i].first << " " << peaks[i].second << "\n";
     }
     outputFile.close();
 
-    qDebug() << "Found" << peakStarts.size() << "peaks. Results saved to" << outputFileName;
+    qDebug() << "Found" << peaks.size() << "peaks. Results saved to" << outputFileName;
 
-    return 0;
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
