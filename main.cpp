@@ -5,6 +5,12 @@
 #include <algorithm>
 #include <gtest/gtest.h>
 
+
+QString inputFileName;
+QString outputFileName;
+int minPeakWidth;
+int maxPeakWidth;
+
 QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
     QVector<float> result = input;
     QVector<float> window(windowSize);
@@ -55,8 +61,6 @@ QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLe
 }
 
 TEST(PeakDetectorTest, OutputFileHasTwoIntegersPerLine) {
-    QString outputFileName = "output.txt";
-
     QFile outputFile(outputFileName);
     if (!outputFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         FAIL() << "Failed to open file: " << outputFileName.toStdString();
@@ -100,10 +104,15 @@ TEST(PeakDetectorTest, OutputFileHasTwoIntegersPerLine) {
 }
 
 int main(int argc, char *argv[]) {
-    QString inputFileName = "rollercoaster/detector_src_32f.bin";
-    QString outputFileName = "output.txt";
-    int minPeakWidth = 3;
-    int maxPeakWidth = 100;
+    if (argc < 5) {
+        qDebug() << "Usage: " << argv[0] << " <input_file> <output_file> <min_peak_width> <max_peak_width>";
+        return 1;
+    }
+
+    inputFileName = argv[1];
+    outputFileName = argv[2];
+    minPeakWidth = QString(argv[3]).toInt();
+    maxPeakWidth = QString(argv[4]).toInt();
     int windowSize = 50;
 
     QFile file(inputFileName);
