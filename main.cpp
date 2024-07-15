@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
     outputFileName = argv[2];
     minPeakWidth = QString(argv[3]).toInt();
     maxPeakWidth = QString(argv[4]).toInt();
-    int windowSize = 50;
+    int windowSize = 10;
 
     QFile file(inputFileName);
     if (!file.open(QIODevice::ReadOnly)) {
