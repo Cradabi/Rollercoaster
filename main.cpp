@@ -12,7 +12,8 @@ int main(int argc, char *argv[]) {
     QString outputFileName = argv[2];
     int minPeakWidth = QString(argv[3]).toInt();
     int maxPeakWidth = QString(argv[4]).toInt();
-    search(inputFileName, outputFileName, minPeakWidth, maxPeakWidth);
+    std::string res = search(inputFileName, outputFileName, minPeakWidth, maxPeakWidth);
+    std::cout << res << "\n";
 
     return 0;
 }

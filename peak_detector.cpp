@@ -51,12 +51,12 @@ QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLe
 }
 
 
-int search(QString inputFileName, QString outputFileName, int minPeakWidth, int maxPeakWidth){
-    int windowSize = 50;
+std::string search(QString inputFileName, QString outputFileName, int minPeakWidth, int maxPeakWidth){
+    int windowSize = 5000;
     QFile file(inputFileName);
     if (!file.open(QIODevice::ReadOnly)) {
         qDebug() << "Cannot open file for reading";
-        return 1;
+        return "fail";
     }
 
     QDataStream in(&file);
@@ -77,12 +77,12 @@ int search(QString inputFileName, QString outputFileName, int minPeakWidth, int 
     std::nth_element(sortedData.begin(), sortedData.begin() + sortedData.size() / 2, sortedData.end());
     float floorLevel = sortedData[sortedData.size() / 2];
 
-    QVector<std::pair<int, int>> peaks = findPeaks(data, floorLevel, minPeakWidth, maxPeakWidth);
+    QVector<std::pair<int, int>> peaks = findPeaks(filteredData, floorLevel, minPeakWidth, maxPeakWidth);
 
     QFile outputFile(outputFileName);
     if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "Cannot open file for writing:" << outputFileName;
-        return 1;
+        return "fail";
     }
 
     QTextStream out(&outputFile);
@@ -91,5 +91,6 @@ int search(QString inputFileName, QString outputFileName, int minPeakWidth, int 
     }
     outputFile.close();
 
-    qDebug() << "Found" << peaks.size() << "peaks. Results saved to" << outputFileName;
+    std::string res_str = "Found " + std::to_string(peaks.size()) + " peaks.";
+    return res_str;
 }

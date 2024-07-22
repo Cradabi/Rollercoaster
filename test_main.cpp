@@ -8,8 +8,8 @@ QString outputFileName;
 int minw;
 int maxw;
 
-TEST(PeakDetectorTest, OutputFileHasTwoIntegersPerLine) {
-    search(inputFileName, outputFileName, minw, maxw);
+TEST(PeakDetectorTest, PeaksTest) {
+    std::string res_str = search(inputFileName, outputFileName, minw, maxw);
 
     QFile outputFile(outputFileName);
     if (!outputFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -51,6 +51,10 @@ TEST(PeakDetectorTest, OutputFileHasTwoIntegersPerLine) {
     }
 
     outputFile.close();
+
+    if(res_str != "Found 20 peaks."){
+        FAIL() << "incorrect number of peaks";
+    }
 }
 
 int main(int argc, char *argv[]) {
