@@ -1,24 +1,25 @@
 #include "peak_detector.h"
 #include <algorithm>
+#include <numeric>
+#include <QFile>
+#include <QDataStream>
+#include <QDebug>
+#include <QTextStream>
 
-QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
-    QVector<float> result = input;
-    QVector<float> window(windowSize);
+QVector<float> movingAverage(const QVector<float>& input, int windowSize) {
+    QVector<float> result(input.size(), 0.0);
+    float sum = 0.0f;
 
     for (int i = 0; i < input.size(); ++i) {
-        for (int j = 0; j < windowSize; ++j) {
-            int idx = i - windowSize / 2 + j;
-            if (idx < 0) {
-                idx = 0;
-            }
-            if (idx >= input.size()) {
-                idx = input.size() - 1;
-            }
-            window[j] = input[idx];
+        sum += input[i];
+        if (i >= windowSize) {
+            sum -= input[i - windowSize];
         }
-        std::nth_element(window.begin(), window.begin() + windowSize / 2, window.end());
-        result[i] = window[windowSize / 2];
+        if (i >= windowSize - 1) {
+            result[i] = sum / windowSize;
+        }
     }
+
     return result;
 }
 
@@ -39,7 +40,6 @@ QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLe
             }
         }
     }
-
     if (inPeak) {
         int peakWidth = data.size() - peakStart;
         if (peakWidth >= minPeakWidth && peakWidth <= maxPeakWidth) {
@@ -50,8 +50,7 @@ QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLe
     return peaks;
 }
 
-
-std::string search(QString inputFileName, QString outputFileName, int minPeakWidth, int maxPeakWidth){
+std::string search(QString inputFileName, QString outputFileName, int minPeakWidth, int maxPeakWidth) {
     int windowSize = 5000;
     QFile file(inputFileName);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -71,7 +70,7 @@ std::string search(QString inputFileName, QString outputFileName, int minPeakWid
 
     file.close();
 
-    QVector<float> filteredData = medianFilter(data, windowSize);
+    QVector<float> filteredData = movingAverage(data, windowSize);
 
     QVector<float> sortedData = filteredData;
     std::nth_element(sortedData.begin(), sortedData.begin() + sortedData.size() / 2, sortedData.end());
@@ -91,6 +90,5 @@ std::string search(QString inputFileName, QString outputFileName, int minPeakWid
     }
     outputFile.close();
 
-    std::string res_str = "Found " + std::to_string(peaks.size()) + " peaks.";
-    return res_str;
+    return "Found " + std::to_string(peaks.size()) + " peaks.";
 }
