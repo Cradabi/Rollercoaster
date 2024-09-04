@@ -1,26 +1,57 @@
 #include "peak_detector.h"
 #include <algorithm>
+#include <QVector>
+#include <set>
 
 QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
-    QVector<float> result = input;
-    QVector<float> window(windowSize);
+    QVector<float> result(input.size());
+    std::multiset<float> window;
+
+    int halfWindowSize = windowSize / 2;
 
     for (int i = 0; i < input.size(); ++i) {
-        for (int j = 0; j < windowSize; ++j) {
-            int idx = i - windowSize / 2 + j;
-            if (idx < 0) {
-                idx = 0;
-            }
-            if (idx >= input.size()) {
-                idx = input.size() - 1;
-            }
-            window[j] = input[idx];
+        if (i >= windowSize) {
+            window.erase(window.find(input[i - windowSize]));
         }
-        std::nth_element(window.begin(), window.begin() + windowSize / 2, window.end());
-        result[i] = window[windowSize / 2];
+
+        window.insert(input[i]);
+
+        if (i >= halfWindowSize) {
+            auto midIter = std::next(window.begin(), halfWindowSize);
+            result[i - halfWindowSize + 1] = *midIter;
+        }
     }
+
+    for (int i = input.size() - halfWindowSize; i < input.size(); ++i) {
+        window.erase(window.find(input[i - windowSize + halfWindowSize]));
+        auto midIter = std::next(window.begin(), halfWindowSize);
+        result[i] = *midIter;
+    }
+
     return result;
 }
+
+
+//QVector<float> medianFilter(const QVector<float>& input, int windowSize) {
+//    QVector<float> result = input;
+//    QVector<float> window(windowSize);
+
+//    for (int i = 0; i < input.size(); ++i) {
+//        for (int j = 0; j < windowSize; ++j) {
+//            int idx = i - windowSize / 2 + j;
+//            if (idx < 0) {
+//                idx = 0;
+//            }
+//            if (idx >= input.size()) {
+//                idx = input.size() - 1;
+//            }
+//            window[j] = input[idx];
+//        }
+//        std::nth_element(window.begin(), window.begin() + windowSize / 2, window.end());
+//        result[i] = window[windowSize / 2];
+//    }
+//    return result;
+//}
 
 QVector<std::pair<int, int>> findPeaks(const QVector<float>& data, float floorLevel, int minPeakWidth, int maxPeakWidth) {
     QVector<std::pair<int, int>> peaks;
